@@ -17,6 +17,8 @@ class Invoice extends Model
         'issue_date',
         'due_date',
         'status',
+        'issued_at',
+        'paid_at',
         'subtotal',
         'total',
         'notes',
@@ -27,9 +29,28 @@ class Invoice extends Model
         return [
             'issue_date' => 'date',
             'due_date'   => 'date',
+            'issued_at'  => 'datetime',
+            'paid_at'    => 'datetime',
             'subtotal'   => 'decimal:2',
             'total'      => 'decimal:2',
         ];
+    }
+
+    public const TRANSITIONS = [
+        'draft'  => ['issued', 'void'],
+        'issued' => ['paid', 'void'],
+        'paid'   => [],
+        'void'   => [],
+    ];
+
+    public function isDraft(): bool
+    {
+        return $this->status === 'draft';
+    }
+
+    public function canMoveTo(string $status): bool
+    {
+        return in_array($status, self::TRANSITIONS[$this->status] ?? [], true);
     }
 
     public function customer(): BelongsTo

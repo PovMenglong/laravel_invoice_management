@@ -7,6 +7,8 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class InvoiceController extends Controller
 {
@@ -35,13 +37,13 @@ class InvoiceController extends Controller
             return $invoice;
         });
 
-        return redirect()->route('invoices.edit', $invoice)
+        return redirect()->route('invoices.show', $invoice)
             ->with('status', "Invoice {$invoice->number} saved.");
     }
 
     public function edit(Invoice $invoice)
     {
-        abort_unless($invoice->status === 'draft', 403, 'Only draft invoices can be edited.');
+        abort_unless($invoice->isDraft(), 403, 'Only draft invoices can be edited.');
 
         return view('invoices.edit', [
             'invoice'   => $invoice,
@@ -55,15 +57,52 @@ class InvoiceController extends Controller
 
     public function update(InvoiceRequest $request, Invoice $invoice)
     {
-        abort_unless($invoice->status === 'draft', 403, 'Only draft invoices can be edited.');
+        abort_unless($invoice->isDraft(), 403, 'Only draft invoices can be edited.');
 
         DB::transaction(function () use ($request, $invoice) {
             $invoice->update($request->safe()->only(['customer_id', 'issue_date', 'due_date', 'notes']));
             $this->syncItems($invoice, $request->validated('items'));
         });
 
-        return redirect()->route('invoices.edit', $invoice)
+        return redirect()->route('invoices.show', $invoice)
             ->with('status', 'Invoice updated.');
+    }
+
+    public function show(Invoice $invoice)
+    {
+        $invoice->load(['customer', 'items', 'user']);
+
+        return view('invoices.show', compact('invoice'));
+    }
+
+    public function destroy(Invoice $invoice)
+    {
+        abort_unless($invoice->isDraft(), 403, 'Only drafts can be deleted. Void the invoice instead.');
+
+        $invoice->delete();
+
+        return redirect()->route('dashboard')->with('status', 'Draft deleted.');
+    }
+
+    public function changeStatus(Request $request, Invoice $invoice)
+    {
+        $new = $request->validate([
+            'status' => ['required', Rule::in(['issued', 'paid', 'void'])],
+        ])['status'];
+
+        if (! $invoice->canMoveTo($new)) {
+            return back()->withErrors([
+                'transition' => "An invoice that is {$invoice->status} cannot become {$new}.",
+            ]);
+        }
+
+        $invoice->update([
+            'status'    => $new,
+            'issued_at' => $new === 'issued' ? now() : $invoice->issued_at,
+            'paid_at'   => $new === 'paid' ? now() : $invoice->paid_at,
+        ]);
+
+        return back()->with('status', "Invoice {$invoice->number} is now {$new}.");
     }
 
     /** Replace the invoice's lines and recalculate every amount on the server. */

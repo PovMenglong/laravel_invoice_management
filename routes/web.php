@@ -20,7 +20,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('customers', CustomerController::class)->except('show');
     Route::resource('invoices', InvoiceController::class);
     Route::resource('invoices', InvoiceController::class)
-        ->only(['create', 'store', 'edit', 'update']);
+        ->only(['create', 'store', 'show', 'edit', 'update', 'destroy']);
+        
+    Route::patch('invoices/{invoice}/status', [InvoiceController::class, 'changeStatus'])
+        ->name('invoices.status');
 });
 
 require __DIR__.'/auth.php';
