@@ -21,6 +21,11 @@ class Invoice extends Model
         'issued_at',
         'paid_at',
         'subtotal',
+        'discount_type',
+        'discount_value',
+        'discount_amount',
+        'tax_rate',
+        'tax_amount',
         'total',
         'notes',
     ];
@@ -33,6 +38,10 @@ class Invoice extends Model
             'issued_at'  => 'datetime',
             'paid_at'    => 'datetime',
             'subtotal'   => 'decimal:2',
+            'discount_value'  => 'decimal:2',
+            'discount_amount' => 'decimal:2',
+            'tax_rate'        => 'decimal:2',
+            'tax_amount'      => 'decimal:2',
             'total'      => 'decimal:2',
         ];
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\InvoiceRequest;
+use App\Support\InvoiceTotals;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Product;
@@ -43,7 +44,13 @@ class InvoiceController extends Controller
     public function create()
     {
         return view('invoices.create', [
-            'invoice'   => new Invoice(['issue_date' => today()]),
+            // CHANGED: new invoices start with discount/tax defaults
+            'invoice'   => new Invoice([
+                'issue_date'     => today(),
+                'discount_type'  => 'fixed',
+                'discount_value' => 0,
+                'tax_rate'       => config('company.tax_rate'),
+            ]),
             'customers' => Customer::orderBy('name')->get(['id', 'name']),
             'products'  => Product::orderBy('name')->get(['id', 'name', 'price']),
             'items'     => [['product_id' => '', 'description' => '', 'qty' => 1, 'unit_price' => 0]],
@@ -54,7 +61,16 @@ class InvoiceController extends Controller
     {
         $invoice = DB::transaction(function () use ($request) {
             $invoice = Invoice::create([
-                ...$request->safe()->only(['customer_id', 'issue_date', 'due_date', 'notes']),
+                // CHANGED: three extra fields are saved
+                ...$request->safe()->only([
+                    'customer_id',
+                    'issue_date',
+                    'due_date',
+                    'notes',
+                    'discount_type',
+                    'discount_value',
+                    'tax_rate',
+                ]),
                 'number'  => $this->nextNumber(),
                 'user_id' => $request->user()->id,
                 'status'  => 'draft',
@@ -78,7 +94,7 @@ class InvoiceController extends Controller
             'customers' => Customer::orderBy('name')->get(['id', 'name']),
             'products'  => Product::orderBy('name')->get(['id', 'name', 'price']),
             'items'     => $invoice->items
-                ->map(fn ($i) => $i->only(['product_id', 'description', 'qty', 'unit_price']))
+                ->map(fn($i) => $i->only(['product_id', 'description', 'qty', 'unit_price']))
                 ->values(),
         ]);
     }
@@ -88,7 +104,16 @@ class InvoiceController extends Controller
         abort_unless($invoice->isDraft(), 403, 'Only draft invoices can be edited.');
 
         DB::transaction(function () use ($request, $invoice) {
-            $invoice->update($request->safe()->only(['customer_id', 'issue_date', 'due_date', 'notes']));
+            // CHANGED: three extra fields are saved
+            $invoice->update($request->safe()->only([
+                'customer_id',
+                'issue_date',
+                'due_date',
+                'notes',
+                'discount_type',
+                'discount_value',
+                'tax_rate',
+            ]));
             $this->syncItems($invoice, $request->validated('items'));
         });
 
@@ -145,7 +170,8 @@ class InvoiceController extends Controller
     {
         $invoice->items()->delete();
 
-        $subtotal = 0;
+        // CHANGED: collect line totals, then let InvoiceTotals do the discount/tax math
+        $lineTotals = [];
 
         foreach ($rows as $row) {
             $lineTotal = round($row['qty'] * $row['unit_price'], 2);
@@ -158,11 +184,15 @@ class InvoiceController extends Controller
                 'line_total'  => $lineTotal,
             ]);
 
-            $subtotal += $lineTotal;
+            $lineTotals[] = $lineTotal;
         }
 
-        $subtotal = round($subtotal, 2);
-        $invoice->update(['subtotal' => $subtotal, 'total' => $subtotal]);
+        $invoice->update(InvoiceTotals::calculate(
+            $lineTotals,
+            $invoice->discount_type,
+            (float) $invoice->discount_value,
+            (float) $invoice->tax_rate,
+        ));
     }
 
     /** INV-2026-0001, INV-2026-0002, ... restarting each year. */

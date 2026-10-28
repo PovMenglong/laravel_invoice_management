@@ -95,6 +95,25 @@
                         @endforeach
                     </tbody>
                     <tfoot>
+                        <tr class="border-t">
+                            <td colspan="3" class="py-2 text-right">Subtotal</td>
+                            <td class="py-2 text-right">{{ number_format($invoice->subtotal, 2) }}</td>
+                        </tr>
+                        @if ($invoice->discount_amount > 0)
+                            <tr>
+                                <td colspan="3" class="py-2 text-right">
+                                    Discount{{ $invoice->discount_type === 'percent' ? ' (' . rtrim(rtrim($invoice->discount_value, '0'), '.') . '%)' : '' }}
+                                </td>
+                                <td class="py-2 text-right">-{{ number_format($invoice->discount_amount, 2) }}</td>
+                            </tr>
+                        @endif
+                        @if ($invoice->tax_rate > 0)
+                            <tr>
+                                <td colspan="3" class="py-2 text-right">Tax
+                                    ({{ rtrim(rtrim($invoice->tax_rate, '0'), '.') }}%)</td>
+                                <td class="py-2 text-right">{{ number_format($invoice->tax_amount, 2) }}</td>
+                            </tr>
+                        @endif
                         <tr class="border-t font-semibold">
                             <td colspan="3" class="py-3 text-right">Total</td>
                             <td class="py-3 text-right">{{ number_format($invoice->total, 2) }}</td>

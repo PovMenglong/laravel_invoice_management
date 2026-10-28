@@ -38,14 +38,26 @@
      x-data="{
         items: @js(old('items', $items)),
         products: @js($products),
+        discountType: @js(old('discount_type', $invoice->discount_type ?? 'fixed')),
+        discountValue: @js(old('discount_value', $invoice->discount_value ?? 0)),
+        taxRate: @js(old('tax_rate', $invoice->tax_rate ?? 0)),
+
         addLine() { this.items.push({ product_id: '', description: '', qty: 1, unit_price: 0 }) },
         removeLine(i) { this.items.splice(i, 1) },
         pick(i) {
             const p = this.products.find(p => p.id == this.items[i].product_id)
             if (p) { this.items[i].description = p.name; this.items[i].unit_price = p.price }
         },
-        lineTotal(it) { return (Number(it.qty) || 0) * (Number(it.unit_price) || 0) },
-        get total() { return this.items.reduce((s, it) => s + this.lineTotal(it), 0) },
+
+        round(n) { return Math.round((n + Number.EPSILON) * 100) / 100 },
+        lineTotal(it) { return this.round((Number(it.qty) || 0) * (Number(it.unit_price) || 0)) },
+        get subtotal() { return this.round(this.items.reduce((s, it) => s + this.lineTotal(it), 0)) },
+        get discount() {
+            const v = Number(this.discountValue) || 0
+            return this.round(this.discountType === 'percent' ? this.subtotal * v / 100 : Math.min(v, this.subtotal))
+        },
+        get tax() { return this.round((this.subtotal - this.discount) * (Number(this.taxRate) || 0) / 100) },
+        get grandTotal() { return this.round(this.subtotal - this.discount + this.tax) },
         money(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
      }">
 
@@ -93,9 +105,38 @@
         </tbody>
     </table>
 
-    <div class="mt-3 flex items-center justify-between">
-        <button type="button" @click="addLine()" class="text-sm text-indigo-600">+ Add line</button>
-        <div class="text-lg font-semibold">Total: <span x-text="money(total)"></span></div>
+    <button type="button" @click="addLine()" class="mt-3 text-sm text-indigo-600">+ Add line</button>
+
+    <div class="mt-6 ml-auto w-full max-w-sm space-y-2 text-sm">
+        <div class="flex justify-between">
+            <span>Subtotal</span>
+            <span x-text="money(subtotal)"></span>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+            <span>Discount</span>
+            <span class="flex gap-1">
+                <select name="discount_type" x-model="discountType" class="rounded-md border-gray-300 text-sm">
+                    <option value="fixed">Amount</option>
+                    <option value="percent">%</option>
+                </select>
+                <input type="number" step="0.01" min="0" name="discount_value" x-model.number="discountValue"
+                       class="w-24 rounded-md border-gray-300 text-sm">
+            </span>
+            <span x-text="'-' + money(discount)"></span>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+            <span>Tax rate (%)</span>
+            <input type="number" step="0.01" min="0" max="100" name="tax_rate" x-model.number="taxRate"
+                   class="w-24 rounded-md border-gray-300 text-sm">
+            <span x-text="money(tax)"></span>
+        </div>
+
+        <div class="flex justify-between border-t pt-2 text-lg font-semibold">
+            <span>Total</span>
+            <span x-text="money(grandTotal)"></span>
+        </div>
     </div>
 </div>
 
