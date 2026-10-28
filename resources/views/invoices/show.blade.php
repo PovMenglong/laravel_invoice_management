@@ -1,15 +1,15 @@
 @php
     $badge = [
-        'draft'  => 'bg-gray-100 text-gray-700',
+        'draft' => 'bg-gray-100 text-gray-700',
         'issued' => 'bg-blue-100 text-blue-700',
-        'paid'   => 'bg-green-100 text-green-700',
-        'void'   => 'bg-red-100 text-red-700',
+        'paid' => 'bg-green-100 text-green-700',
+        'void' => 'bg-red-100 text-red-700',
     ][$invoice->status];
 
     $actions = [
         'issued' => ['Issue', 'Issue this invoice? It will be locked and can no longer be edited.'],
-        'paid'   => ['Mark as paid', 'Mark this invoice as paid?'],
-        'void'   => ['Void', 'Void this invoice? This cannot be undone.'],
+        'paid' => ['Mark as paid', 'Mark this invoice as paid?'],
+        'void' => ['Void', 'Void this invoice? This cannot be undone.'],
     ];
 @endphp
 
@@ -17,7 +17,8 @@
     <x-slot name="header">
         <h2 class="text-xl font-semibold text-gray-800">
             Invoice {{ $invoice->number }}
-            <span class="ml-2 rounded-full px-2 py-1 text-xs font-medium {{ $badge }}">{{ ucfirst($invoice->status) }}</span>
+            <span
+                class="ml-2 rounded-full px-2 py-1 text-xs font-medium {{ $badge }}">{{ ucfirst($invoice->status) }}</span>
         </h2>
     </x-slot>
 
@@ -34,25 +35,27 @@
             {{-- Actions --}}
             <div class="flex flex-wrap gap-2">
                 @if ($invoice->isDraft())
-                    <a href="{{ route('invoices.edit', $invoice) }}"
-                       class="rounded-md border px-4 py-2 text-sm">Edit</a>
+                    <a href="{{ route('invoices.edit', $invoice) }}" class="rounded-md border px-4 py-2 text-sm">Edit</a>
+                    <a href="{{ route('invoices.print', $invoice) }}" target="_blank" rel="noopener"
+                        class="rounded-md border px-4 py-2 text-sm">Print</a>
                 @endif
 
                 @foreach ($actions as $to => [$label, $confirm])
                     @if ($invoice->canMoveTo($to))
                         <form method="POST" action="{{ route('invoices.status', $invoice) }}"
-                              onsubmit="return confirm('{{ $confirm }}')">
+                            onsubmit="return confirm('{{ $confirm }}')">
                             @csrf
                             @method('PATCH')
                             <input type="hidden" name="status" value="{{ $to }}">
-                            <button class="rounded-md bg-gray-800 px-4 py-2 text-sm text-white">{{ $label }}</button>
+                            <button
+                                class="rounded-md bg-gray-800 px-4 py-2 text-sm text-white">{{ $label }}</button>
                         </form>
                     @endif
                 @endforeach
 
                 @if ($invoice->isDraft())
                     <form method="POST" action="{{ route('invoices.destroy', $invoice) }}"
-                          onsubmit="return confirm('Delete this draft?')">
+                        onsubmit="return confirm('Delete this draft?')">
                         @csrf
                         @method('DELETE')
                         <button class="rounded-md px-4 py-2 text-sm text-red-600">Delete draft</button>

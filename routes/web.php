@@ -21,9 +21,12 @@ Route::middleware('auth')->group(function () {
     Route::resource('invoices', InvoiceController::class);
     Route::resource('invoices', InvoiceController::class)
         ->only(['create', 'store', 'show', 'edit', 'update', 'destroy']);
-        
+
     Route::patch('invoices/{invoice}/status', [InvoiceController::class, 'changeStatus'])
         ->name('invoices.status');
+
+    Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])
+        ->name('invoices.print');
 });
 
 require __DIR__.'/auth.php';

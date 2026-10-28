@@ -105,6 +105,13 @@ class InvoiceController extends Controller
         return back()->with('status', "Invoice {$invoice->number} is now {$new}.");
     }
 
+    public function print(Invoice $invoice)
+    {
+        $invoice->load(['customer', 'items']);
+
+        return view('invoices.print', compact('invoice'));
+    }
+
     /** Replace the invoice's lines and recalculate every amount on the server. */
     private function syncItems(Invoice $invoice, array $rows): void
     {
