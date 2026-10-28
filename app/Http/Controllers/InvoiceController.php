@@ -12,6 +12,34 @@ use Illuminate\Validation\Rule;
 
 class InvoiceController extends Controller
 {
+    public function index(Request $request)
+    {
+        $filters = $request->validate([
+            'q'      => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', Rule::in(['draft', 'issued', 'overdue', 'paid', 'void'])],
+            'from'   => ['nullable', 'date'],
+            'to'     => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $invoices = Invoice::query()
+            ->with('customer:id,name')
+            ->when($filters['q'] ?? null, fn($query, $term) => $query->where(function ($w) use ($term) {
+                $w->where('number', 'like', "%{$term}%")
+                    ->orWhereHas('customer', fn($c) => $c->where('name', 'like', "%{$term}%"));
+            }))
+            ->when($filters['status'] ?? null, fn($query, $status) => $status === 'overdue'
+                ? $query->overdue()
+                : $query->where('status', $status))
+            ->when($filters['from'] ?? null, fn($query, $date) => $query->whereDate('issue_date', '>=', $date))
+            ->when($filters['to'] ?? null, fn($query, $date) => $query->whereDate('issue_date', '<=', $date))
+            ->latest('issue_date')
+            ->latest('id')
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('invoices.index', compact('invoices'));
+    }
+
     public function create()
     {
         return view('invoices.create', [
@@ -81,7 +109,7 @@ class InvoiceController extends Controller
 
         $invoice->delete();
 
-        return redirect()->route('dashboard')->with('status', 'Draft deleted.');
+        return redirect()->route('invoices.index')->with('status', 'Draft deleted.');
     }
 
     public function changeStatus(Request $request, Invoice $invoice)

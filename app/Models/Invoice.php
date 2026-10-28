@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 // app/Models/Invoice.php
@@ -66,5 +67,17 @@ class Invoice extends Model
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class);
+    }
+
+    public function scopeOverdue(Builder $query): Builder
+    {
+        return $query->where('status', 'issued')->whereDate('due_date', '<', today());
+    }
+
+    public function isOverdue(): bool
+    {
+        return $this->status === 'issued'
+            && $this->due_date !== null
+            && $this->due_date->lt(today());
     }
 }
